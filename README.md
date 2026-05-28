@@ -59,7 +59,7 @@ tap_to_toggle = true      # 短按是否切换大小写
 e = "Up"                          # 单键
 a = "Ctrl+Left"                   # 组合键（+ 连接）
 l = "Home, Shift+End, Delete"     # 动作序列（, 分隔）
-alt+e = "Shift+Up"                # 修饰符前缀（CapsLock+Alt+E）
+"alt+e" = "Shift+Up"                # 修饰符前缀（CapsLock+Alt+E）
 ```
 
 ### 键名参考
