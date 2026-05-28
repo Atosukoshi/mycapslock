@@ -35,7 +35,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Config::write_default(&config_path)?;
     }
 
-    let config = Config::load(&config_path).unwrap_or_else(|_| Config::default_config());
+    let config = Config::load(&config_path).unwrap_or_else(|_| {
+        toml::from_str(Config::default_toml_content()).unwrap_or_else(|_| Config::default_config())
+    });
 
     let shared_config: SharedConfig =
         Arc::new(RwLock::new(AppConfig::new(config, config_path.clone())));

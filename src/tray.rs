@@ -321,7 +321,11 @@ impl TrayHandle {
 
 fn check_config(path: &PathBuf) -> String {
     if !path.exists() {
-        return format!("Config file not found:\n{}\n\nRun with default.toml to create one.", path.display());
+        let content = crate::config::Config::default_toml_content();
+        match std::fs::write(path, content) {
+            Ok(()) => return format!("Created config.toml from default settings:\n\n{}", content),
+            Err(e) => return format!("Config not found and failed to create:\n{}", e),
+        }
     }
     match std::fs::read_to_string(path) {
         Err(e) => format!("Cannot read config:\n{}", e),
