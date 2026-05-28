@@ -4,6 +4,10 @@ use notify::{Event, EventKind, RecursiveMode, Watcher};
 use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+use windows::Win32::System::Registry::{
+    RegCloseKey, RegDeleteValueW, RegOpenKeyExW, RegQueryValueExW, RegSetValueExW, HKEY,
+    HKEY_CURRENT_USER, KEY_READ, KEY_WRITE, REG_SZ,
+};
 use windows::Win32::UI::WindowsAndMessaging::*;
 use windows::Win32::UI::Shell::*;
 
@@ -15,9 +19,55 @@ const WINDOW_CLASS: PCWSTR = w!("MyCapsLockTrayClass");
 const WM_TRAYICON: u32 = WM_APP + 1;
 const WM_OPEN_CONFIG: u32 = WM_APP + 2;
 const WM_CHECK_CONFIG: u32 = WM_APP + 3;
+const WM_TOGGLE_AUTOSTART: u32 = WM_APP + 4;
 const ID_TRAY_EXIT: u16 = 1001;
 const ID_TRAY_OPEN: u16 = 1002;
 const ID_TRAY_CHECK: u16 = 1003;
+const ID_TRAY_AUTOSTART: u16 = 1004;
+
+const RUN_KEY: PCWSTR = w!("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run");
+const VALUE_NAME: PCWSTR = w!("MyCapsLock");
+
+fn is_autostart_enabled() -> bool {
+    unsafe {
+        let mut hkey = HKEY::default();
+        if RegOpenKeyExW(HKEY_CURRENT_USER, RUN_KEY, Some(0), KEY_READ, &mut hkey).is_ok() {
+            let mut buf = [0u16; 520];
+            let mut size = (buf.len() * 2) as u32;
+            let result = RegQueryValueExW(
+                hkey,
+                VALUE_NAME,
+                None,
+                None,
+                Some(buf.as_mut_ptr() as *mut u8),
+                Some(&mut size),
+            );
+            let _ = RegCloseKey(hkey);
+            return result.is_ok();
+        }
+    }
+    false
+}
+
+fn set_autostart(enabled: bool) {
+    unsafe {
+        let exe_path = std::env::current_exe().unwrap();
+        let exe_str: Vec<u16> = exe_path.to_string_lossy().encode_utf16().chain(std::iter::once(0)).collect();
+        let data = std::slice::from_raw_parts(exe_str.as_ptr() as *const u8, exe_str.len() * 2);
+
+        let mut hkey = HKEY::default();
+        if RegOpenKeyExW(HKEY_CURRENT_USER, RUN_KEY, Some(0), KEY_WRITE, &mut hkey).is_ok() {
+            if enabled {
+                let _ = RegSetValueExW(hkey, VALUE_NAME, Some(0), REG_SZ, Some(data));
+                log::info!("Auto-start enabled");
+            } else {
+                let _ = RegDeleteValueW(hkey, VALUE_NAME);
+                log::info!("Auto-start disabled");
+            }
+            let _ = RegCloseKey(hkey);
+        }
+    }
+}
 
 pub struct TrayHandle {
     hwnd: HWND,
@@ -53,6 +103,10 @@ unsafe extern "system" fn tray_wnd_proc(
                 unsafe {
                     let _ = PostMessageW(Some(hwnd), WM_CHECK_CONFIG, WPARAM(0), LPARAM(0));
                 }
+            } else if cmd == ID_TRAY_AUTOSTART {
+                unsafe {
+                    let _ = PostMessageW(Some(hwnd), WM_TOGGLE_AUTOSTART, WPARAM(0), LPARAM(0));
+                }
             }
             LRESULT(0)
         }
@@ -66,9 +120,13 @@ unsafe extern "system" fn tray_wnd_proc(
 
 unsafe fn show_popup_menu(hwnd: HWND) {
     let menu = unsafe { CreatePopupMenu().unwrap() };
+    let autostart = is_autostart_enabled();
+    let check_flag = if autostart { MF_CHECKED } else { MENU_ITEM_FLAGS(0) };
     unsafe {
         let _ = AppendMenuW(menu, MENU_ITEM_FLAGS(0), ID_TRAY_OPEN as usize, w!("Open Config"));
         let _ = AppendMenuW(menu, MENU_ITEM_FLAGS(0), ID_TRAY_CHECK as usize, w!("Check Config"));
+        let _ = AppendMenuW(menu, MENU_ITEM_FLAGS(0) | MF_SEPARATOR, 0, PCWSTR::null());
+        let _ = AppendMenuW(menu, check_flag, ID_TRAY_AUTOSTART as usize, w!("Auto Start"));
         let _ = AppendMenuW(menu, MENU_ITEM_FLAGS(0), ID_TRAY_EXIT as usize, w!("Exit"));
     }
     let mut pt = POINT::default();
@@ -221,6 +279,10 @@ impl TrayHandle {
                             w!("Config Status"),
                             MB_OK,
                         );
+                    }
+                    if msg.message == WM_TOGGLE_AUTOSTART {
+                        let current = is_autostart_enabled();
+                        set_autostart(!current);
                     }
                     let _ = TranslateMessage(&msg);
                     DispatchMessageW(&msg);
