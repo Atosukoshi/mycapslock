@@ -33,8 +33,8 @@ o = "Shift+End"     # 选中到行尾
 # ═══════════════════════════════════════════
 n = "Backspace"                     # 删除光标左侧一个字符
 m = "Delete"                        # 删除光标右侧一个字符
-y = "Shift+End, Delete"             # 删除光标到行尾
-h = "Shift+Home, Delete"            # 删除光标到行首
+h = "Shift+End, Delete"             # 删除光标到行尾
+y = "Shift+Home, Delete"            # 删除光标到行首
 backspace = "Home, Shift+End, Delete" # 删除当前行
 
 
