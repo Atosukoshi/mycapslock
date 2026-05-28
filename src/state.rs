@@ -326,7 +326,6 @@ impl HookContext {
     pub fn send_event(&self, event: HookEvent) {
         match &event {
             HookEvent::Action(_) | HookEvent::ToggleCapsLock => {
-                log::info!("State => {:?}", event);
                 if let Ok(sender) = self.sender.lock() {
                     if let Some(ref tx) = *sender {
                         let _ = tx.send(event);

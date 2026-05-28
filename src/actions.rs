@@ -72,7 +72,6 @@ fn parse_single_action(value: &str) -> Option<Action> {
         if keys.len() == parts.len() && keys.len() >= 2 {
             Some(Action::KeyChord(keys))
         } else {
-            log::warn!("Invalid key chord: {}", value);
             None
         }
     } else {
@@ -89,7 +88,6 @@ pub fn parse_action(value: &str) -> Option<Action> {
         if actions.len() == parts.len() && actions.len() >= 2 {
             Some(Action::Sequence(actions))
         } else {
-            log::warn!("Invalid action sequence: {}", value);
             None
         }
     } else {
@@ -149,10 +147,8 @@ impl MappingTable {
                 if let Some(action) = parse_action(action_str) {
                     table.insert((vk, mod_flags), action);
                 } else {
-                    log::warn!("Unknown action: {}", action_str);
                 }
             } else {
-                log::warn!("Unknown key name: {}", key_name);
             }
         }
         Self { table }

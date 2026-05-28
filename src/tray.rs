@@ -59,10 +59,8 @@ fn set_autostart(enabled: bool) {
         if RegOpenKeyExW(HKEY_CURRENT_USER, RUN_KEY, Some(0), KEY_WRITE, &mut hkey).is_ok() {
             if enabled {
                 let _ = RegSetValueExW(hkey, VALUE_NAME, Some(0), REG_SZ, Some(data));
-                log::info!("Auto-start enabled");
             } else {
                 let _ = RegDeleteValueW(hkey, VALUE_NAME);
-                log::info!("Auto-start disabled");
             }
             let _ = RegCloseKey(hkey);
         }
@@ -232,15 +230,12 @@ impl TrayHandle {
         }) {
             Ok(mut w) => {
                 let parent = config_path.parent().unwrap_or(&config_path);
-                if let Err(e) = w.watch(parent, RecursiveMode::NonRecursive) {
-                    log::error!("Failed to watch config dir: {}", e);
+                if let Err(_) = w.watch(parent, RecursiveMode::NonRecursive) {
                 } else {
-                    log::info!("Watching config: {}", config_path.display());
                 }
                 Some(w)
             }
-            Err(e) => {
-                log::error!("Failed to create file watcher: {}", e);
+            Err(_) => {
                 None
             }
         };
@@ -293,20 +288,16 @@ impl TrayHandle {
             loop {
                 match action_rx.try_recv() {
                     Ok(HookEvent::Action(action)) => {
-                        log::info!("Main => {:?}", action);
-                        if let Err(e) = action_executor.execute(&action) {
-                            log::error!("Failed to execute action: {}", e);
+                        if let Err(_) = action_executor.execute(&action) {
                         }
                     }
                     Ok(HookEvent::ToggleCapsLock) => {
-                        log::info!("Main => ToggleCapsLock");
                         let _ = action_executor.execute(&crate::actions::Action::KeyPress(
                             enigo::Key::CapsLock,
                         ));
                     }
                     Ok(HookEvent::PassThrough | HookEvent::Block) => {}
                     Err(std::sync::mpsc::TryRecvError::Disconnected) => {
-                        log::error!("Hook thread disconnected unexpectedly");
                         return;
                     }
                     Err(std::sync::mpsc::TryRecvError::Empty) => break,
@@ -316,7 +307,6 @@ impl TrayHandle {
             // Check for config file changes (hot reload)
             while let Ok(event) = watch_rx.try_recv() {
                 if matches!(event.kind, EventKind::Modify(_)) {
-                    log::info!("Config file changed, reloading...");
                     reload_hook_from_config(&shared_config);
                 }
             }
@@ -360,14 +350,12 @@ fn check_config(path: &PathBuf) -> String {
 
 fn reload_hook_from_config(shared_config: &SharedConfig) {
     if let Ok(mut app_cfg) = shared_config.write() {
-        if let Err(e) = app_cfg.reload() {
-            log::error!("Config reload failed: {}", e);
+        if let Err(_) = app_cfg.reload() {
             return;
         }
         let mapping = MappingTable::from_cursor_mappings(&app_cfg.config.mappings.cursor);
         let threshold = app_cfg.config.settings.hold_threshold_ms;
         let toggle = app_cfg.config.settings.tap_to_toggle;
         crate::hook::update_hook_settings(threshold, toggle, mapping);
-        log::info!("Config hot-reloaded successfully");
     }
 }

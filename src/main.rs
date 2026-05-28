@@ -13,7 +13,6 @@ use actions::{ActionExecutor, MappingTable};
 use config::{AppConfig, Config, SharedConfig};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    use std::io::Write;
     let exe_dir = std::env::current_exe()?.parent().unwrap().to_path_buf();
 
     // Prevent multiple instances via named mutex
@@ -30,28 +29,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    let log_file = std::fs::File::create(exe_dir.join("mycapslock.log"))?;
-    env_logger::Builder::new()
-        .format(|buf, record| writeln!(buf, "[{} {}] {}", record.level(), record.target(), record.args()))
-        .target(env_logger::Target::Pipe(Box::new(log_file)))
-        .filter_level(log::LevelFilter::Info)
-        .init();
-
-    let exe_dir = std::env::current_exe()?
-        .parent()
-        .unwrap()
-        .to_path_buf();
     let config_path = exe_dir.join("config.toml");
 
     if !config_path.exists() {
         Config::write_default(&config_path)?;
-        log::info!("Created default config from embedded default.toml");
     }
 
-    let config = Config::load(&config_path).unwrap_or_else(|e| {
-        log::warn!("Failed to load config: {}, using built-in defaults", e);
-        Config::default_config()
-    });
+    let config = Config::load(&config_path).unwrap_or_else(|_| Config::default_config());
 
     let shared_config: SharedConfig =
         Arc::new(RwLock::new(AppConfig::new(config, config_path.clone())));
@@ -59,16 +43,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (mapping, hold_threshold, tap_to_toggle) = {
         let cfg = shared_config.read().unwrap();
         let mapping = MappingTable::from_cursor_mappings(&cfg.config.mappings.cursor);
-        let hold_threshold = cfg.config.settings.hold_threshold_ms;
-        let tap_to_toggle = cfg.config.settings.tap_to_toggle;
-        (mapping, hold_threshold, tap_to_toggle)
+        (mapping, cfg.config.settings.hold_threshold_ms, cfg.config.settings.tap_to_toggle)
     };
-
-    log::info!(
-        "Config loaded: hold_threshold={}ms, tap_to_toggle={}",
-        hold_threshold,
-        tap_to_toggle
-    );
 
     let (tx, rx) = std::sync::mpsc::sync_channel(256);
 
@@ -79,7 +55,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut tray_handle = tray::create_tray_window(config_path.clone())?;
     tray_handle.run_message_loop(rx, executor, shared_config.clone(), config_path);
 
-    log::info!("Message loop exited, stopping hook thread");
     hook_thread.stop();
 
     Ok(())

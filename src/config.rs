@@ -108,10 +108,8 @@ impl AppConfig {
 
     pub fn reload(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.config = Config::load(&self.config_path).unwrap_or_else(|_| {
-            log::warn!("Failed to reload config, keeping current");
             self.config.clone()
         });
-        log::info!("Config reloaded");
         Ok(())
     }
 }

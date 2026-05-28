@@ -89,8 +89,7 @@ pub fn run_hook_thread(
 
         match hook {
             Ok(hook) => {
-                log::info!("Keyboard hook installed");
-
+                
                 let mut msg = MSG::default();
                 loop {
                     let ret = unsafe { GetMessageW(&mut msg, None, 0, 0) };
@@ -103,13 +102,11 @@ pub fn run_hook_thread(
                     let _ = UnhookWindowsHookEx(hook);
                 }
             }
-            Err(e) => {
-                log::error!("Failed to install keyboard hook: {:?}", e);
-            }
+            Err(_) => {
+                            }
         }
 
-        log::info!("Hook thread exiting");
-    });
+            });
 
     let thread_id = ready_rx.recv().expect("Hook thread should start");
     HookThread { handle, thread_id }
@@ -118,10 +115,5 @@ pub fn run_hook_thread(
 pub fn update_hook_settings(hold_threshold_ms: u64, tap_to_toggle: bool, mapping: MappingTable) {
     if let Some(ctx) = CTX.get() {
         ctx.update_settings(hold_threshold_ms, tap_to_toggle, mapping);
-        log::info!(
-            "Hook settings updated: threshold={}ms, tap_to_toggle={}",
-            hold_threshold_ms,
-            tap_to_toggle
-        );
     }
 }
